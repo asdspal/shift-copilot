@@ -31,7 +31,7 @@ app.get('/health', (_req: Request, res: Response) => {
 });
 
 // Webhook endpoint for Telegram
-app.post('/webhook', async (req: Request, res: Response) => {
+app.post('/webhook', async (req: Request, res: Response): Promise<void> => {
   const actionId = generateActionId();
   const startTime = Date.now();
 
@@ -40,7 +40,8 @@ app.post('/webhook', async (req: Request, res: Response) => {
     const secret = req.headers['x-telegram-bot-api-secret-token'];
     if (secret !== config.telegram.webhookSecret) {
       logger.warn({ actionId }, 'Invalid webhook secret');
-      return res.status(401).json({ error: 'Unauthorized' });
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
     }
 
     const update: TelegramUpdate = req.body;
@@ -50,6 +51,7 @@ app.post('/webhook', async (req: Request, res: Response) => {
     if (update.message && update.message.text) {
       const message = update.message;
       const userId = message.from.id.toString();
+      const messageText: string = message.text ?? '';
 
       // Rate limiting
       const rateLimit = checkRateLimit(userId);
@@ -59,12 +61,13 @@ app.post('/webhook', async (req: Request, res: Response) => {
           message.chat.id,
           `⚠️ Rate limit exceeded. Please wait ${resetIn} seconds before sending more commands.`
         );
-        return res.json({ ok: true });
+        res.json({ ok: true });
+        return;
       }
 
       // Parse command
-      const parsed = parseCommand(message.text);
-      
+      const parsed = parseCommand(messageText);
+
       let response: string;
 
       if (!parsed) {
